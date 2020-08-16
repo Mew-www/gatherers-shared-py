@@ -2,7 +2,7 @@ import time
 import datetime
 from .record import Record
 from .changed_record import ChangedRecord
-from typing import List, Dict, TypedDict, NamedTuple, TYPE_CHECKING
+from typing import List, NamedTuple, TYPE_CHECKING
 
 # Get type hints without importing
 # https://github.com/python/mypy/issues/1829#issuecomment-231273766
@@ -18,7 +18,9 @@ class DiffResults(NamedTuple):
 
 
 def diff_and_update_state(
-    fresh_records: List[Record], collection_state: Collection
+    fresh_records: List[Record],
+    collection_state: Collection,
+    retention_period: datetime.timedelta = datetime.timedelta(days=1),
 ) -> DiffResults:
     # Get former records from StateDB
     former_records = [
@@ -83,9 +85,7 @@ def diff_and_update_state(
 
     # Diff for "removed" records (that haven't been seen in >24 hours)
     removed_records: List[Record] = []
-    timedelta_ago = datetime.datetime.fromtimestamp(time.time()) - datetime.timedelta(
-        days=1
-    )
+    timedelta_ago = datetime.datetime.fromtimestamp(time.time()) - retention_period
     oldest_permitted_timestamp = timedelta_ago.timestamp()
     for record in former_records:
         # Remove (>timedelta) non-existent records from cache and remember them via removed_records
