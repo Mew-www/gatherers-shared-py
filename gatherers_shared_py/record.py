@@ -23,12 +23,17 @@ class Record:
     record.identifying_fields
     record.last_updated
     """
-    def __init__(self, data: dict, identifying_fields: list, last_updated: Union[int, float]):
+
+    def __init__(
+        self, data: dict, identifying_fields: list, last_updated: Union[int, float]
+    ):
         if not identifying_fields:
             raise ValueError("Minimum one identifying field is required")
         for field_name in identifying_fields:
             if field_name not in data:
-                raise ValueError(f"Identifying field '{field_name}' is missing from data")
+                raise ValueError(
+                    f"Identifying field '{field_name}' is missing from data"
+                )
         self.__data = data
         self.__identifying_fields = sorted(identifying_fields)
         self.__last_updated = int(last_updated)
@@ -46,10 +51,16 @@ class Record:
         return self.__last_updated
 
     def __str__(self):
-        return "Record: " + ",".join([f"{k}={self.__data[k]}" for k in self.__identifying_fields])
+        return "Record: " + ",".join(
+            [f"{k}={self.__data[k]}" for k in self.__identifying_fields]
+        )
 
     def to_dict(self):
-        return {"data": self.data, "identifying_fields": self.identifying_fields, "last_updated": self.last_updated}
+        return {
+            "data": self.data,
+            "identifying_fields": self.identifying_fields,
+            "last_updated": self.last_updated,
+        }
 
     # custom instance comparison
 
