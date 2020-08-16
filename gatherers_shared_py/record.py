@@ -1,8 +1,4 @@
 from typing import Union
-from collections import namedtuple
-
-
-RecordTuple = namedtuple("RecordTuple", ["data", "identifying_fields", "last_updated"])
 
 
 class Record:
