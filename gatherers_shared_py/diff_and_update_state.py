@@ -4,12 +4,15 @@ import datetime
 from .record import Record
 from .changed_record import ChangedRecord
 from typing import List, NamedTuple, TYPE_CHECKING
+import logging
 
 # Get type hints without importing
 # https://github.com/python/mypy/issues/1829#issuecomment-231273766
 # https://mypy.readthedocs.io/en/latest/common_issues.html#import
 if TYPE_CHECKING:
     from pymongo.collection import Collection
+
+logger = logging.getLogger(__name__)
 
 
 class DiffResults(NamedTuple):
@@ -28,12 +31,14 @@ def diff_and_update_state(
     retention_period: datetime.timedelta = datetime.timedelta(days=1),
 ) -> DiffResults:
     # Get former records from StateDB
+    logger.info("Fetching previous records from StateDB")
     former_records = [
         Record(r["data"], r["identifying_fields"], r["last_updated"])
         for r in list(collection_state.find())
     ]
 
     # Split to "refreshed" / "unseen" (=removed depending on their timestamp & retention period), saving some cycles
+    logger.info("Pre-splitting old records to 'newly refreshed' and 'unseen'")
     refreshed_old_records = []
     unseen_old_records = []
     for old_record in former_records:
@@ -41,8 +46,11 @@ def diff_and_update_state(
             refreshed_old_records.append(old_record)
         else:
             unseen_old_records.append(old_record)
+    logger.info(f"{len(refreshed_old_records)} 'refreshed' old records")
+    logger.info(f"{len(unseen_old_records)} 'unseen' and possibly removed old records")
 
     # Diff for added or refreshed (and possibly changed - subset of refreshed) records
+    logger.info("Processing both 'new' and 'refreshed' records. Tracking 'changes'")
     added_records: List[Record] = []
     changed_records: List[ChangedRecord] = []  # Subset of "refreshed_records"
     # Following is done for performance reasons, with 1000s of op's otherwise CPU will become bottleneck
@@ -101,9 +109,13 @@ def diff_and_update_state(
                 )
     # Persist the inserts and replaces if any
     if bulk_inserts_and_replaces:
+        logger.info(f"Bulk persisting {len(bulk_inserts_and_replaces)} records")
         collection_state.bulk_write(bulk_inserts_and_replaces, ordered=False)
+    else:
+        logger.info("No 'new' or 'refreshed' records to persist")
 
     # Diff for "removed" records (that haven't been seen in >24 hours)
+    logger.info("Processing 'unseen' old records that may be gone")
     removed_records: List[Record] = []
     timedelta_ago = datetime.datetime.fromtimestamp(time.time()) - retention_period
     oldest_permitted_timestamp = timedelta_ago.timestamp()
@@ -120,7 +132,10 @@ def diff_and_update_state(
             removed_records.append(record)
     # Persist the deletes if any
     if bulk_deletes:
+        logger.info(f"Bulk deleting {len(bulk_deletes)} records")
         collection_state.bulk_write(bulk_deletes, ordered=False)
+    else:
+        logger.info("No 'unseen' records (past retention period) to delete")
 
     return DiffResults(
         added=added_records, changed=changed_records, removed=removed_records,
