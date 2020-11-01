@@ -22,9 +22,9 @@ def diff_and_update_state(
     fresh_records: List[Record],
     collection_state: Collection,
     # These are required for bulk_write, and to force use of pymongo version from actual callee (=no 2 pymongo versions)
-    insertOneOp,
-    replaceOneOp,
-    deleteOneOp,
+    InsertOneOp,
+    ReplaceOneOp,
+    DeleteOneOp,
     retention_period: datetime.timedelta = datetime.timedelta(days=1),
 ) -> DiffResults:
     # Get former records from StateDB
@@ -32,6 +32,15 @@ def diff_and_update_state(
         Record(r["data"], r["identifying_fields"], r["last_updated"])
         for r in list(collection_state.find())
     ]
+
+    # Split to "refreshed" / "unseen" (=removed depending on their timestamp & retention period), saving some cycles
+    refreshed_old_records = []
+    unseen_old_records = []
+    for old_record in former_records:
+        if old_record in fresh_records:
+            refreshed_old_records.append(old_record)
+        else:
+            unseen_old_records.append(old_record)
 
     # Diff for added or refreshed (and possibly changed - subset of refreshed) records
     added_records: List[Record] = []
@@ -41,8 +50,8 @@ def diff_and_update_state(
     for fresh_record in fresh_records:
 
         # Insert added records to cache and remember them via added_records
-        if fresh_record not in former_records:
-            bulk_inserts_and_replaces.append(insertOneOp(fresh_record.to_dict()))
+        if fresh_record not in refreshed_old_records:
+            bulk_inserts_and_replaces.append(InsertOneOp(fresh_record.to_dict()))
             added_records.append(fresh_record)
 
         # Else refresh existing records' timestamp (and possibly fields), and diff for added, changed, or removed fields
@@ -54,12 +63,12 @@ def diff_and_update_state(
                 for k in fresh_record.identifying_fields
             }
             bulk_inserts_and_replaces.append(
-                replaceOneOp(identifiers_dict, fresh_record.to_dict())
+                ReplaceOneOp(identifiers_dict, fresh_record.to_dict())
             )
 
             # Diff for added/changed/removed .data fields
             former_matching_record = next(
-                filter(lambda r: r == fresh_record, former_records)
+                filter(lambda r: r == fresh_record, refreshed_old_records)
             )
             # removed_fields will contain former value
             added_fields, changed_fields, removed_fields = (
@@ -90,8 +99,9 @@ def diff_and_update_state(
                         "removed": removed_fields,
                     }
                 )
-    # Persist the inserts and replaces
-    collection_state.bulk_write(bulk_inserts_and_replaces, ordered=False)
+    # Persist the inserts and replaces if any
+    if bulk_inserts_and_replaces:
+        collection_state.bulk_write(bulk_inserts_and_replaces, ordered=False)
 
     # Diff for "removed" records (that haven't been seen in >24 hours)
     removed_records: List[Record] = []
@@ -99,20 +109,18 @@ def diff_and_update_state(
     oldest_permitted_timestamp = timedelta_ago.timestamp()
     # As with inserts & replaces, following is done for performance reasons
     bulk_deletes = []
-    for record in former_records:
-        # If record was fresh, skip since it's still relevant
-        if record in fresh_records:
-            continue
+    for record in unseen_old_records:
         # Remove (>timedelta) non-existent records from cache and remember them via removed_records
         if oldest_permitted_timestamp > record.last_updated:
             # Use MongoDB's "nested query" (dot-delimited) syntax for identifier fields
             identifiers_dict = {
                 f"data.{k}": record.data[k] for k in record.identifying_fields
             }
-            bulk_deletes.append(deleteOneOp(identifiers_dict))
+            bulk_deletes.append(DeleteOneOp(identifiers_dict))
             removed_records.append(record)
-    # Persist the deletes
-    collection_state.bulk_write(bulk_deletes, ordered=False)
+    # Persist the deletes if any
+    if bulk_deletes:
+        collection_state.bulk_write(bulk_deletes, ordered=False)
 
     return DiffResults(
         added=added_records, changed=changed_records, removed=removed_records,
