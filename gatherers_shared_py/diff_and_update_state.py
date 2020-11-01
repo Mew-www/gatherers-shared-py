@@ -50,11 +50,11 @@ def diff_and_update_state(
     logger.info(f"{len(unseen_old_records)} 'unseen' and possibly removed old records")
 
     # Diff for added or refreshed (and possibly changed - subset of refreshed) records
-    logger.info("Processing both 'new' and 'refreshed' records. Tracking 'changes'")
     added_records: List[Record] = []
     changed_records: List[ChangedRecord] = []  # Subset of "refreshed_records"
     # Following is done for performance reasons, with 1000s of op's otherwise CPU will become bottleneck
     bulk_inserts_and_replaces = []
+    logger.info("Processing both 'new' and 'refreshed' records, and tracking 'changes'")
     for fresh_record in fresh_records:
 
         # Insert added records to cache and remember them via added_records
@@ -115,12 +115,12 @@ def diff_and_update_state(
         logger.info("No 'new' or 'refreshed' records to persist")
 
     # Diff for "removed" records (that haven't been seen in >24 hours)
-    logger.info("Processing 'unseen' old records that may be gone")
     removed_records: List[Record] = []
     timedelta_ago = datetime.datetime.fromtimestamp(time.time()) - retention_period
     oldest_permitted_timestamp = timedelta_ago.timestamp()
     # As with inserts & replaces, following is done for performance reasons
     bulk_deletes = []
+    logger.info("Processing 'unseen' old records that may be gone")
     for record in unseen_old_records:
         # Remove (>timedelta) non-existent records from cache and remember them via removed_records
         if oldest_permitted_timestamp > record.last_updated:

@@ -8,7 +8,7 @@ with open("requirements.txt", "r") as fh:
 
 setuptools.setup(
     name="gatherers-shared-py",
-    version="3.2.0",
+    version="3.2.1",
     author="Miy",
     author_email="mew.proxy@hotmail.com",
     description="Utilities for gathering services",
