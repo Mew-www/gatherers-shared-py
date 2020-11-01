@@ -113,8 +113,6 @@ def diff_and_update_state(
     if bulk_inserts_and_replaces:
         logger.info(f"Bulk persisting {len(bulk_inserts_and_replaces)} records")
         collection_state.bulk_write(bulk_inserts_and_replaces, ordered=False)
-    else:
-        logger.info("No 'new' or 'refreshed' records to persist")
 
     # Diff for "removed" records (that haven't been seen in >24 hours)
     removed_records: List[Record] = []
@@ -136,8 +134,6 @@ def diff_and_update_state(
     if bulk_deletes:
         logger.info(f"Bulk deleting {len(bulk_deletes)} records")
         collection_state.bulk_write(bulk_deletes, ordered=False)
-    else:
-        logger.info("No 'unseen' records (past retention period) to delete")
 
     return DiffResults(
         added=added_records, changed=changed_records, removed=removed_records,
