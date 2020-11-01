@@ -37,6 +37,9 @@ class Record:
         self.__data = data
         self.__identifying_fields = sorted(identifying_fields)
         self.__last_updated = int(last_updated)
+        self.__identifying_values_for_eq_hash = tuple(
+            self.__data[k] for k in self.__identifying_fields
+        )
 
     @property
     def data(self):
@@ -64,15 +67,15 @@ class Record:
 
     # custom instance comparison
 
-    def __identifying_values(self):
-        return tuple(self.__data[k] for k in self.__identifying_fields)
-
     def __hash__(self):
-        return hash(self.__identifying_values())
+        return hash(self.__identifying_values_for_eq_hash)
 
     def __eq__(self, other):
         if isinstance(other, Record):
-            return self.__identifying_values() == other.__identifying_values()
+            return (
+                self.__identifying_values_for_eq_hash
+                == other.__identifying_values_for_eq_hash
+            )
         return NotImplemented
 
     def __ne__(self, other):
