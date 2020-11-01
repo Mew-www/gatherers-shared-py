@@ -46,15 +46,17 @@ def diff_and_update_state(
             refreshed_old_records.append(old_record)
         else:
             unseen_old_records.append(old_record)
-    logger.info(f"{len(refreshed_old_records)} 'refreshed' old records")
-    logger.info(f"{len(unseen_old_records)} 'unseen' and possibly removed old records")
 
+    logger.info(
+        f"{len(refreshed_old_records)} 'refreshed' old records."
+        + f" {len(unseen_old_records)} 'unseen' and possibly removed old records."
+        + " Starting to process both 'new' and 'refreshed' records, and tracking 'changes'."
+    )
     # Diff for added or refreshed (and possibly changed - subset of refreshed) records
     added_records: List[Record] = []
     changed_records: List[ChangedRecord] = []  # Subset of "refreshed_records"
     # Following is done for performance reasons, with 1000s of op's otherwise CPU will become bottleneck
     bulk_inserts_and_replaces = []
-    logger.info("Processing both 'new' and 'refreshed' records, and tracking 'changes'")
     for fresh_record in fresh_records:
 
         # Insert added records to cache and remember them via added_records
