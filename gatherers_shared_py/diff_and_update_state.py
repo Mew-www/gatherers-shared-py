@@ -97,7 +97,7 @@ def diff_and_update_state(
                 if key not in fresh_record.data.keys():
                     removed_fields[key] = value
                 elif value != fresh_record.data[key]:
-                    changed_fields[key] = fresh_record.data[key]
+                    changed_fields[key] = {"old": value, "new": fresh_record.data[key]}
 
             # Remember any records with changed fields
             if added_fields or changed_fields or removed_fields:
